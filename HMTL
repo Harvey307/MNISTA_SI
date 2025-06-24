@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Reconocimiento de Dígitos MNIST</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+  <style>
+    video, canvas { display: block; margin: 10px auto; }
+  </style>
+</head>
+<body>
+
+<h1 style="text-align:center;">Reconocer número escrito a mano</h1>
+<video id="video" width="224" height="224" autoplay></video>
+<canvas id="canvas" width="28" height="28" style="display:none;"></canvas>
+<h2 style="text-align:center;">Número detectado: <span id="resultado">...</span></h2>
+
+<script>
+  let model;
+
+  async function cargarModelo() {
+    model = await tf.loadLayersModel('modelo_web/model.json');
+    console.log("Modelo cargado");
+  }
+
+  async function predecir() {
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    ctx.drawImage(video, 0, 0, 28, 28);
+    let imageData = ctx.getImageData(0, 0, 28, 28);
+    
+    // Normalizar
+    let img = tf.browser.fromPixels(imageData, 1).toFloat().div(255.0).expandDims(0);
+    let prediction = model.predict(img);
+    let index = prediction.argMax(1).dataSync()[0];
+
+    document.getElementById("resultado").innerText = index;
+    requestAnimationFrame(predecir);
+  }
+
+  async function iniciar() {
+    await cargarModelo();
+    const video = document.getElementById("video");
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then(stream => {
+        video.srcObject = stream;
+        video.addEventListener('loadeddata', predecir);
+      });
+  }
+
+  iniciar();
+</script>
+
+</body>
+</html>
