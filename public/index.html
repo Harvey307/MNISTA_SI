@@ -24,7 +24,8 @@
   let currentStream = null;
 
   async function cargarModelo() {
-    model = await tf.loadLayersModel('modelo_web/model.json');
+    model = await tf.loadLayersModel('model.json');
+
     console.log("Modelo cargado");
   }
 
