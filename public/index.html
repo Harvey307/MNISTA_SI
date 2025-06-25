@@ -2,55 +2,94 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Reconocimiento de Dígitos MNIST</title>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+  <title>Reconocimiento de Dígitos</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0"></script>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
-    video, canvas { display: block; margin: 10px auto; }
+    video, canvas {
+      display: block;
+      margin: auto;
+      max-width: 100%;
+    }
+    #resultado {
+      font-size: 1.8rem;
+      font-weight: bold;
+      margin-top: 15px;
+    }
   </style>
 </head>
 <body>
 
-<h1 style="text-align:center;">Reconocer número escrito a mano</h1>
-<video id="video" width="224" height="224" autoplay></video>
-<canvas id="canvas" width="28" height="28" style="display:none;"></canvas>
-<h2 style="text-align:center;">Número detectado: <span id="resultado">...</span></h2>
+<main> 
+  <div class="px-4 py-2 text-center border-bottom">
+    <h1 class="display-5 fw-bold">Reconocer número escrito a mano</h1>
+    <p class="lead mb-0">Clasificación usando TensorFlow.js y cámara web</p>
+  </div>
+
+  <div class="container mt-5">
+    <div class="row">
+      <div class="col-md-6 offset-md-3 text-center">
+        <video id="video" autoplay playsinline width="224" height="224"></video>
+        <canvas id="canvas" width="224" height="224"></canvas>
+        <canvas id="minicanvas" width="28" height="28" style="display:none;"></canvas>
+        <div id="resultado">Número detectado: ...</div>
+      </div>
+    </div>
+  </div>
+</main>
 
 <script>
-  let model;
+  let modelo;
+  let video = document.getElementById('video');
+  let canvas = document.getElementById('canvas');
+  let ctx = canvas.getContext('2d');
+  let minicanvas = document.getElementById('minicanvas');
+  let ctxMini = minicanvas.getContext('2d');
 
-  async function cargarModelo() {
-    model = await tf.loadLayersModel('modelo_web/model.json');
-    console.log("Modelo cargado");
+  const cargarModelo = async () => {
+    console.log("Cargando modelo...");
+    modelo = await tf.loadGraphModel("modelo_tfjs/model.json");
+    console.log("Modelo cargado.");
+    iniciarCamara();
   }
 
-  async function predecir() {
-    const video = document.getElementById('video');
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
-
-    ctx.drawImage(video, 0, 0, 28, 28);
-    let imageData = ctx.getImageData(0, 0, 28, 28);
-    
-    // Normalizar
-    let img = tf.browser.fromPixels(imageData, 1).toFloat().div(255.0).expandDims(0);
-    let prediction = model.predict(img);
-    let index = prediction.argMax(1).dataSync()[0];
-
-    document.getElementById("resultado").innerText = index;
-    requestAnimationFrame(predecir);
-  }
-
-  async function iniciar() {
-    await cargarModelo();
-    const video = document.getElementById("video");
-    navigator.mediaDevices.getUserMedia({ video: true })
+  const iniciarCamara = () => {
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
       .then(stream => {
         video.srcObject = stream;
-        video.addEventListener('loadeddata', predecir);
+        video.addEventListener('loadeddata', procesarFrame);
+      })
+      .catch(err => {
+        console.error("Error accediendo a la cámara:", err);
       });
   }
 
-  iniciar();
+  const procesarFrame = () => {
+    ctx.drawImage(video, 0, 0, 224, 224);
+    ctxMini.drawImage(canvas, 0, 0, 28, 28);
+
+    let imgData = ctxMini.getImageData(0, 0, 28, 28);
+    let data = [];
+
+    for (let i = 0; i < imgData.data.length; i += 4) {
+      let r = imgData.data[i] / 255;
+      let g = imgData.data[i + 1] / 255;
+      let b = imgData.data[i + 2] / 255;
+      let gray = (r + g + b) / 3;
+      data.push(gray);
+    }
+
+    let tensor = tf.tensor(data, [1, 28, 28, 1]);
+    let prediccion = modelo.predict(tensor);
+    prediccion.array().then(result => {
+      let maxIndex = result[0].indexOf(Math.max(...result[0]));
+      document.getElementById('resultado').innerText = "Número detectado: " + maxIndex;
+    });
+
+    requestAnimationFrame(procesarFrame);
+  }
+
+  cargarModelo();
 </script>
 
 </body>
