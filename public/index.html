@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Reconocer número escrito a mano</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background: #fff;
+    }
+    h1 {
+      font-size: 2.5rem;
+      margin-top: 20px;
+    }
+    #video {
+      display: block;
+      margin: 20px auto;
+      border: 1px solid #ccc;
+    }
+    #canvas {
+      display: none;
+    }
+    #resultado {
+      font-size: 1.5rem;
+      font-weight: bold;
+      margin-top: 20px;
+    }
+    button {
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Reconocer número escrito a mano</h1>
+  <p>Clasificación usando TensorFlow.js y cámara web</p>
+  
+  <video id="video" width="224" height="224" autoplay muted playsinline></video>
+  <canvas id="canvas" width="224" height="224"></canvas>
+  <h2>Número detectado: <span id="resultado">...</span></h2>
+  <button onclick="cambiarCamara()">Cambiar cámara</button>
+
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0"></script>
+
+
+  <script>
+    let tamano = 224;
+    let video = document.getElementById("video");
+    let canvas = document.getElementById("canvas");
+    let ctx = canvas.getContext("2d");
+    let currentStream = null;
+    let facingMode = "user";
+    let modelo = null;
+
+    async function cargarModelo() {
+      console.log("Cargando modelo...");
+      modelo = await tf.loadGraphModel("model.json"); // Asegúrate que model.json y pesos estén en la misma carpeta
+      console.log("Modelo cargado.");
+    }
+
+    function mostrarCamara() {
+      const opciones = {
+        audio: false,
+        video: {
+          width: tamano,
+          height: tamano,
+          facingMode: facingMode
+        }
+      };
+
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices.getUserMedia(opciones)
+          .then(function(stream) {
+            currentStream = stream;
+            video.srcObject = stream;
+            video.play();
+            procesarCamara();
+            predecir();
+          })
+          .catch(function(err) {
+            alert("No se pudo utilizar la cámara.");
+            console.error("Error de cámara:", err);
+          });
+      } else {
+        alert("Tu navegador no soporta getUserMedia");
+      }
+    }
+
+    function cambiarCamara() {
+      if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+      }
+      facingMode = facingMode === "user" ? "environment" : "user";
+      mostrarCamara();
+    }
+
+    function procesarCamara() {
+      ctx.drawImage(video, 0, 0, tamano, tamano);
+      setTimeout(procesarCamara, 100);
+    }
+
+    function predecir() {
+      if (modelo) {
+        let imgData = ctx.getImageData(0, 0, tamano, tamano);
+        let gray = [];
+
+        for (let i = 0; i < imgData.data.length; i += 4) {
+          let r = imgData.data[i] / 255;
+          let g = imgData.data[i + 1] / 255;
+          let b = imgData.data[i + 2] / 255;
+          let avg = (r + g + b) / 3;
+          gray.push(avg);
+        }
+
+        let input = tf.tensor4d(gray, [1, tamano, tamano, 1]);
+        let pred = modelo.predict(input).dataSync();
+        let resultado = pred.indexOf(Math.max(...pred));
+
+        document.getElementById("resultado").innerText = resultado;
+        input.dispose();
+      }
+
+      setTimeout(predecir, 500); // cada medio segundo
+    }
+
+    window.onload = async () => {
+      await cargarModelo();
+      mostrarCamara();
+    };
+  </script>
+
+</body>
+</html>
