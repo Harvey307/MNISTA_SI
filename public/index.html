@@ -44,7 +44,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0"></script>
 
-
   <script>
     let tamano = 224;
     let video = document.getElementById("video");
@@ -56,7 +55,7 @@
 
     async function cargarModelo() {
       console.log("Cargando modelo...");
-      modelo = await tf.loadGraphModel("model.json"); // Asegúrate que model.json y pesos estén en la misma carpeta
+      modelo = await tf.loadLayersModel("model.json");
       console.log("Modelo cargado.");
     }
 
@@ -103,6 +102,7 @@
 
     function predecir() {
       if (modelo) {
+        ctx.drawImage(video, 0, 0, tamano, tamano);
         let imgData = ctx.getImageData(0, 0, tamano, tamano);
         let gray = [];
 
@@ -114,15 +114,18 @@
           gray.push(avg);
         }
 
-        let input = tf.tensor4d(gray, [1, tamano, tamano, 1]);
-        let pred = modelo.predict(input).dataSync();
+        let inputTensor = tf.tensor4d(gray, [1, tamano, tamano, 1]);
+        let resized = tf.image.resizeBilinear(inputTensor, [28, 28]);
+        
+        let pred = modelo.predict(resized).dataSync();
         let resultado = pred.indexOf(Math.max(...pred));
-
         document.getElementById("resultado").innerText = resultado;
-        input.dispose();
+
+        inputTensor.dispose();
+        resized.dispose();
       }
 
-      setTimeout(predecir, 500); // cada medio segundo
+      setTimeout(predecir, 500);
     }
 
     window.onload = async () => {
