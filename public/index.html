@@ -56,7 +56,7 @@
 
     async function cargarModelo() {
       console.log("Cargando modelo...");
-      modelo = await tf.loadLayersModel("model.json"); // Asegúrate que model.json y pesos estén en la misma carpeta
+      modelo = await tf.loadGraphModel("model.json"); // Asegúrate que model.json y pesos estén en la misma carpeta
       console.log("Modelo cargado.");
     }
 
